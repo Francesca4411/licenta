@@ -1,0 +1,30 @@
+@using StudyManagement.Models.Shared
+@{
+    var items = Model as IReadOnlyList<BreadcrumbItem> ?? ViewData["Breadcrumbs"] as IReadOnlyList<BreadcrumbItem>;
+}
+@if (items is { Count: > 0 })
+{
+    <nav class="sp-breadcrumb" aria-label="Breadcrumb">
+        <ol class="sp-breadcrumb-list">
+            @for (var i = 0; i < items.Count; i++)
+            {
+                var it = items[i];
+                var isLast = i == items.Count - 1;
+                <li class="sp-breadcrumb-item">
+                    @if (!isLast && !string.IsNullOrEmpty(it.Url))
+                    {
+                        <a class="sp-breadcrumb-link" href="@it.Url">@it.Text</a>
+                    }
+                    else if (isLast)
+                    {
+                        <span class="sp-breadcrumb-current" aria-current="page">@it.Text</span>
+                    }
+                    else
+                    {
+                        <span class="sp-breadcrumb-current">@it.Text</span>
+                    }
+                </li>
+            }
+        </ol>
+    </nav>
+}

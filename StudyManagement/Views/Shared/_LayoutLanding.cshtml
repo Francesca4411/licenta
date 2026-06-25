@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Study Planner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/StudyManagement.styles.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="sp-shell sp-shell--landing" data-theme="light">
+        <div class="sp-landing-bg" aria-hidden="true">
+            <div class="sp-landing-bg-gradient"></div>
+            <div class="sp-landing-bg-grid"></div>
+            <div class="sp-landing-orb sp-landing-orb--1"></div>
+            <div class="sp-landing-orb sp-landing-orb--2"></div>
+            <div class="sp-landing-orb sp-landing-orb--3"></div>
+            <div class="sp-landing-bg-shine"></div>
+        </div>
+        <div class="sp-main sp-main--landing">
+            <header class="sp-topbar sp-topbar--landing" role="banner">
+                <a asp-controller="Home" asp-action="Index" class="sp-landing-brand">
+                    <span class="sp-landing-brand-icon" aria-hidden="true">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                            <path d="M4 6.5C4 5.12 5.12 4 6.5 4H20v16H6.5C5.12 20 4 18.88 4 17.5V6.5Z" fill="currentColor" opacity="0.25"/>
+                            <path d="M6.5 6H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            <path d="M7 20V4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </span>
+                    <span class="sp-landing-brand-text">Study Planner</span>
+                </a>
+                <div class="sp-topbar-actions">
+                    <button type="button" class="sp-theme-toggle sp-theme-toggle--compact" id="themeToggleLanding" aria-label="Toggle dark mode">
+                        <span class="sp-theme-toggle-icon" aria-hidden="true">☾</span>
+                        <span class="sp-theme-toggle-text" id="themeToggleLandingLabel">Dark</span>
+                    </button>
+                </div>
+            </header>
+            <main class="sp-content sp-content--landing">
+                @RenderBody()
+            </main>
+        </div>
+    </div>
+    <script>
+        (function () {
+            const root = document.querySelector('.sp-shell');
+            const toggle = document.getElementById('themeToggleLanding');
+            const icon = toggle?.querySelector('.sp-theme-toggle-icon');
+            const label = document.getElementById('themeToggleLandingLabel');
+            function applyTheme(theme) {
+                root?.setAttribute('data-theme', theme);
+                const isDark = theme === 'dark';
+                if (icon) icon.textContent = isDark ? '☀' : '☾';
+                if (label) label.textContent = isDark ? 'Light' : 'Dark';
+                if (toggle) toggle.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+                document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+            }
+            const saved = localStorage.getItem('sp-theme');
+            applyTheme(saved === 'dark' ? 'dark' : 'light');
+            toggle?.addEventListener('click', function () {
+                const current = root?.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+                const next = current === 'dark' ? 'light' : 'dark';
+                localStorage.setItem('sp-theme', next);
+                applyTheme(next);
+            });
+        })();
+    </script>
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,48 @@
+@model StudyManagement.Models.ViewModels.Auth.RegisterViewModel
+@{
+    ViewData["Title"] = "Register";
+    Layout = "~/Views/Shared/_LayoutLanding.cshtml";
+}
+
+<div class="sp-panel sp-auth-panel">
+    <div class="sp-panel-header">
+        <h2 class="sp-panel-title">Create account</h2>
+    </div>
+    <div class="sp-panel-body">
+        <form asp-action="Register" method="post" class="sp-form">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="sp-note"></div>
+
+            <label class="sp-field">
+                <span class="sp-label">Email</span>
+                <input asp-for="Email" type="email" />
+                <span asp-validation-for="Email" class="sp-field-error"></span>
+            </label>
+
+            <label class="sp-field">
+                <span class="sp-label">Password</span>
+                <input asp-for="Password" type="password" />
+                <span asp-validation-for="Password" class="sp-field-error"></span>
+            </label>
+
+            <label class="sp-field">
+                <span class="sp-label">Confirm password</span>
+                <input asp-for="ConfirmPassword" type="password" />
+                <span asp-validation-for="ConfirmPassword" class="sp-field-error"></span>
+            </label>
+
+            <div class="sp-form-actions">
+                <button type="submit" class="sp-btn-primary">Register</button>
+            </div>
+        </form>
+
+        <p style="margin-top:12px;">
+            Already have an account? <a asp-controller="Account" asp-action="Login">Login</a>
+        </p>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <partial name="_ValidationScriptsPartial" />
+}

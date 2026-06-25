@@ -1,0 +1,450 @@
+@model StudyManagement.Models.ViewModels.PomodoroViewModel
+@{
+    ViewData["Title"] = "Pomodoro";
+    ViewData["Breadcrumbs"] = new List<BreadcrumbItem> {
+        new("Dashboard", Url.Action("Index", "Home")!),
+        new("Pomodoro", null)
+    };
+}
+
+<header class="sp-titlebar">
+    <div>
+        <h1 class="sp-h1">Pomodoro Timer <span class="sp-h1-icon" aria-hidden="true">⏱</span></h1>
+        <p class="sp-subtitle">Stay focused with the Pomodoro Technique</p>
+    </div>
+</header>
+
+@Html.AntiForgeryToken()
+
+<div class="sp-grid-2">
+    <div class="sp-panel">
+        <div class="sp-panel-header">
+            <div class="sp-panel-badge" aria-hidden="true" style="background: linear-gradient(135deg, #7c3aed, #5b21b6);">💼</div>
+            <h2 class="sp-panel-title">Focus Time</h2>
+        </div>
+
+        <div class="sp-panel-body">
+            <div class="sp-pomo-mode" id="pomoModeLabel">Focus</div>
+
+            <div class="sp-pomo-duration-row">
+                <label class="sp-label" for="pomoFocusMinutes">Focus duration</label>
+                <select id="pomoFocusMinutes" class="sp-pomo-duration-select" title="Minutes for each focus block">
+                    <option value="15">15 min</option>
+                    <option value="20">20 min</option>
+                    <option value="25" selected>25 min</option>
+                    <option value="30">30 min</option>
+                    <option value="45">45 min</option>
+                    <option value="50">50 min</option>
+                    <option value="60">60 min</option>
+                    <option value="90">90 min</option>
+                </select>
+            </div>
+
+            <div class="sp-pomo-timer-wrap">
+                <svg class="sp-pomo-ring" viewBox="0 0 220 220" aria-hidden="true">
+                    <circle class="sp-pomo-ring-bg" cx="110" cy="110" r="94"></circle>
+                    <circle class="sp-pomo-ring-progress" id="pomoProgress" cx="110" cy="110" r="94"></circle>
+                </svg>
+                <div class="sp-pomo-time" id="pomoTime">25:00</div>
+            </div>
+
+            <div class="sp-pomo-controls">
+                <button type="button" class="sp-btn-primary" id="pomoStartPauseBtn">Start</button>
+                <button type="button" class="sp-btn-secondary" id="pomoResetBtn">Reset</button>
+                <button type="button" class="sp-btn-secondary" id="pomoSkipBtn">Skip</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="sp-panel">
+        <div class="sp-panel-header">
+            <div class="sp-panel-badge" aria-hidden="true" style="background: linear-gradient(135deg, #22c55e, #6366f1);">📊</div>
+            <h2 class="sp-panel-title">Session Stats</h2>
+        </div>
+        <div class="sp-panel-body">
+            <div class="sp-pomo-stats">
+                <div class="sp-pomo-stat">
+                    <div class="sp-pomo-stat-label">Pomodoros today (saved)</div>
+                    <div class="sp-pomo-stat-value" id="pomoServerToday">@Model.PomodorosToday</div>
+                </div>
+                <div class="sp-pomo-stat">
+                    <div class="sp-pomo-stat-label">Current streak (days)</div>
+                    <div class="sp-pomo-stat-value" id="pomoServerStreak">@Model.CurrentStreakDays</div>
+                </div>
+                <div class="sp-pomo-stat">
+                    <div class="sp-pomo-stat-label">Total focus time (min, all time)</div>
+                    <div class="sp-pomo-stat-value" id="pomoServerTotal">@Model.TotalFocusMinutes</div>
+                </div>
+
+                <div class="sp-pomo-stat sp-pomo-stat-divider">
+                    <div class="sp-pomo-stat-label">Pomodoros in this run</div>
+                    <div class="sp-pomo-stat-value" id="pomoCount">0</div>
+                </div>
+
+                <div class="sp-pomo-stat">
+                    <div class="sp-pomo-stat-label">Current phase</div>
+                    <div class="sp-pomo-stat-value" id="pomoPhase">Focus</div>
+                </div>
+
+                <div class="sp-pomo-stat">
+                    <div class="sp-pomo-stat-label">Cycles until long break</div>
+                    <div class="sp-pomo-stat-value" id="pomoUntilLongBreak">4</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const SHORT_BREAK_SEC = 5 * 60;
+            const LONG_BREAK_SEC = 15 * 60;
+            const LONG_BREAK_EVERY = 4;
+            const DURATION_PREFS_KEY = "sp.pomodoro.focusMinutes.v1";
+
+            // Minutes per focus block (1–120), synced with select + localStorage
+            let focusMinutes = 25;
+
+            let isRunning = false;
+            let mode = "focus";
+            let remainingSec = 25 * 60;
+            let completedFocusCount = 0;
+            let timerId = null;
+            let expectedEndAtMs = null;
+
+            const STORAGE_KEY = "sp.pomodoro.state.v1";
+            const recordUrl = '@Url.Action("RecordPomodoroCompletion", "Pomodoro")';
+
+            const modeLabel = document.getElementById("pomoModeLabel");
+            const timeLabel = document.getElementById("pomoTime");
+            const phaseLabel = document.getElementById("pomoPhase");
+            const countLabel = document.getElementById("pomoCount");
+            const untilLongBreakLabel = document.getElementById("pomoUntilLongBreak");
+            const startPauseBtn = document.getElementById("pomoStartPauseBtn");
+            const resetBtn = document.getElementById("pomoResetBtn");
+            const skipBtn = document.getElementById("pomoSkipBtn");
+            const focusMinutesSelect = document.getElementById("pomoFocusMinutes");
+            const progressCircle = document.getElementById("pomoProgress");
+
+            const elServerToday = document.getElementById("pomoServerToday");
+            const elServerStreak = document.getElementById("pomoServerStreak");
+            const elServerTotal = document.getElementById("pomoServerTotal");
+
+            const radius = 94;
+            const circumference = 2 * Math.PI * radius;
+
+            progressCircle.setAttribute("stroke-dasharray", `${circumference} ${circumference}`);
+            progressCircle.setAttribute("stroke-dashoffset", "0");
+
+            function clampFocusMinutes(m) {
+                const n = parseInt(String(m), 10);
+                if (!Number.isFinite(n)) return 25;
+                return Math.min(120, Math.max(1, n));
+            }
+
+            function getFocusSec() {
+                return focusMinutes * 60;
+            }
+
+            function getModeDuration(modeName) {
+                if (modeName === "focus") return getFocusSec();
+                if (modeName === "shortBreak") return SHORT_BREAK_SEC;
+                return LONG_BREAK_SEC;
+            }
+
+            function syncFocusMinutesSelect() {
+                if (!focusMinutesSelect) return;
+                const v = String(focusMinutes);
+                const opt = Array.prototype.find.call(focusMinutesSelect.options, function (o) { return o.value === v; });
+                if (opt) {
+                    focusMinutesSelect.value = v;
+                } else {
+                    let custom = document.getElementById("pomoFocusMinutesCustom");
+                    if (!custom) {
+                        custom = document.createElement("option");
+                        custom.id = "pomoFocusMinutesCustom";
+                        focusMinutesSelect.appendChild(custom);
+                    }
+                    custom.value = v;
+                    custom.textContent = v + " min (custom)";
+                    focusMinutesSelect.value = v;
+                }
+            }
+
+            function loadFocusMinutesPref() {
+                try {
+                    const raw = localStorage.getItem(DURATION_PREFS_KEY);
+                    if (!raw) return;
+                    focusMinutes = clampFocusMinutes(raw);
+                } catch (_) { }
+            }
+
+            function saveFocusMinutesPref() {
+                try {
+                    localStorage.setItem(DURATION_PREFS_KEY, String(focusMinutes));
+                } catch (_) { }
+            }
+
+            function getModeLabel(modeName) {
+                if (modeName === "focus") return "Focus";
+                if (modeName === "shortBreak") return "Short Break";
+                return "Long Break";
+            }
+
+            function formatSec(sec) {
+                const m = Math.floor(sec / 60);
+                const s = sec % 60;
+                return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+            }
+
+            function updateProgress() {
+                const totalSec = getModeDuration(mode);
+                const ratio = Math.max(0, Math.min(1, remainingSec / totalSec));
+                const offset = circumference * (1 - ratio);
+                progressCircle.setAttribute("stroke-dashoffset", String(offset));
+            }
+
+            function updateUi() {
+                modeLabel.textContent = getModeLabel(mode);
+                phaseLabel.textContent = getModeLabel(mode);
+                timeLabel.textContent = formatSec(remainingSec);
+                countLabel.textContent = String(completedFocusCount);
+
+                const untilLong = LONG_BREAK_EVERY - (completedFocusCount % LONG_BREAK_EVERY);
+                untilLongBreakLabel.textContent = String(untilLong === 0 ? LONG_BREAK_EVERY : untilLong);
+
+                startPauseBtn.textContent = isRunning ? "Pause" : "Start";
+                updateProgress();
+            }
+
+            function saveState() {
+                const payload = {
+                    mode,
+                    isRunning,
+                    remainingSec,
+                    completedFocusCount,
+                    expectedEndAtMs,
+                    focusMinutes
+                };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+            }
+
+            function loadState() {
+                try {
+                    const raw = localStorage.getItem(STORAGE_KEY);
+                    if (!raw) return false;
+
+                    const s = JSON.parse(raw);
+                    if (!s) return false;
+
+                    mode = (s.mode === "focus" || s.mode === "shortBreak" || s.mode === "longBreak") ? s.mode : "focus";
+                    isRunning = !!s.isRunning;
+                    remainingSec = Number.isFinite(s.remainingSec) ? Math.max(0, Math.floor(s.remainingSec)) : getModeDuration(mode);
+                    completedFocusCount = Number.isFinite(s.completedFocusCount) ? Math.max(0, Math.floor(s.completedFocusCount)) : 0;
+                    expectedEndAtMs = Number.isFinite(s.expectedEndAtMs) ? s.expectedEndAtMs : null;
+                    if (Number.isFinite(s.focusMinutes)) {
+                        focusMinutes = clampFocusMinutes(s.focusMinutes);
+                    }
+
+                    return true;
+                } catch {
+                    return false;
+                }
+            }
+
+            function notifyPhaseChange(newMode) {
+                const title = newMode === "focus" ? "Back to focus" : "Take a break";
+                const body = newMode === "focus"
+                    ? "Break ended. Start the next focus session."
+                    : "Focus session ended. Time for a break.";
+
+                try {
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+
+                    osc.type = "sine";
+                    osc.frequency.value = newMode === "focus" ? 880 : 660;
+                    gain.gain.value = 0.05;
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.25);
+                } catch (_) { }
+
+                if ("Notification" in window && Notification.permission === "granted") {
+                    new Notification(title, { body });
+                }
+
+                if ("vibrate" in navigator) {
+                    navigator.vibrate([120, 80, 120]);
+                }
+            }
+
+            function moveToNextPhase() {
+                if (mode === "focus") {
+                    completedFocusCount += 1;
+                    mode = (completedFocusCount % LONG_BREAK_EVERY === 0) ? "longBreak" : "shortBreak";
+                } else {
+                    mode = "focus";
+                }
+                remainingSec = getModeDuration(mode);
+            }
+
+            function reconcileAfterReload() {
+                if (!isRunning || !expectedEndAtMs) return;
+
+                const now = Date.now();
+
+                if (now < expectedEndAtMs) {
+                    remainingSec = Math.max(0, Math.ceil((expectedEndAtMs - now) / 1000));
+                    return;
+                }
+
+                let overMs = now - expectedEndAtMs;
+
+                while (true) {
+                    moveToNextPhase();
+                    const phaseMs = getModeDuration(mode) * 1000;
+
+                    if (overMs < phaseMs) {
+                        remainingSec = Math.max(0, Math.ceil((phaseMs - overMs) / 1000));
+                        expectedEndAtMs = now + remainingSec * 1000;
+                        break;
+                    }
+
+                    overMs -= phaseMs;
+                }
+            }
+
+            function applyServerStats(data) {
+                if (!data) return;
+                // ASP.NET Core JSON: camelCase (PomodorosToday -> pomodorosToday)
+                if (typeof data.pomodorosToday === "number") elServerToday.textContent = String(data.pomodorosToday);
+                if (typeof data.currentStreakDays === "number") elServerStreak.textContent = String(data.currentStreakDays);
+                if (typeof data.totalFocusMinutes === "number") elServerTotal.textContent = String(data.totalFocusMinutes);
+            }
+
+            function recordPomodoroCompletion() {
+                const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+                if (!tokenInput) return;
+
+                const form = new FormData();
+                form.append("__RequestVerificationToken", tokenInput.value);
+                form.append("durationMinutes", String(focusMinutes));
+
+                fetch(recordUrl, {
+                    method: "POST",
+                    body: form,
+                    credentials: "same-origin",
+                    headers: { "Accept": "application/json" }
+                })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(applyServerStats)
+                    .catch(function () { });
+            }
+
+            function tick() {
+                if (!isRunning) return;
+
+                if (expectedEndAtMs) {
+                    remainingSec = Math.max(0, Math.ceil((expectedEndAtMs - Date.now()) / 1000));
+                }
+
+                if (remainingSec > 0) {
+                    updateUi();
+                    saveState();
+                    return;
+                }
+
+                const wasFocus = mode === "focus";
+                moveToNextPhase();
+                expectedEndAtMs = Date.now() + getModeDuration(mode) * 1000;
+                saveState();
+
+                if (wasFocus) {
+                    recordPomodoroCompletion();
+                }
+
+                notifyPhaseChange(mode);
+                updateUi();
+            }
+
+            function startTimer() {
+                if (timerId) return;
+                timerId = setInterval(tick, 250);
+            }
+
+            function stopTimer() {
+                if (!timerId) return;
+                clearInterval(timerId);
+                timerId = null;
+            }
+
+            startPauseBtn.addEventListener("click", function () {
+                if ("Notification" in window && Notification.permission === "default") {
+                    Notification.requestPermission();
+                }
+                isRunning = !isRunning;
+                if (isRunning) {
+                    expectedEndAtMs = Date.now() + remainingSec * 1000;
+                    startTimer();
+                } else {
+                    expectedEndAtMs = null;
+                    stopTimer();
+                }
+                if (focusMinutesSelect) focusMinutesSelect.disabled = isRunning;
+                saveState();
+                updateUi();
+            });
+
+            resetBtn.addEventListener("click", function () {
+                isRunning = false;
+                stopTimer();
+                mode = "focus";
+                remainingSec = getFocusSec();
+                completedFocusCount = 0;
+                expectedEndAtMs = null;
+                saveState();
+                updateUi();
+            });
+
+            skipBtn.addEventListener("click", function () {
+                moveToNextPhase();
+                if (isRunning) {
+                    expectedEndAtMs = Date.now() + getModeDuration(mode) * 1000;
+                }
+                saveState();
+                updateUi();
+            });
+
+            focusMinutesSelect?.addEventListener("change", function () {
+                focusMinutes = clampFocusMinutes(focusMinutesSelect.value);
+                saveFocusMinutesPref();
+                if (!isRunning && mode === "focus") {
+                    remainingSec = getFocusSec();
+                    expectedEndAtMs = null;
+                }
+                saveState();
+                updateUi();
+            });
+
+            loadFocusMinutesPref();
+            const hadSavedTimer = loadState();
+            if (!hadSavedTimer) {
+                remainingSec = getFocusSec();
+            }
+            remainingSec = Math.min(remainingSec, getModeDuration(mode));
+            syncFocusMinutesSelect();
+            saveFocusMinutesPref();
+            reconcileAfterReload();
+            if (isRunning) startTimer();
+            if (focusMinutesSelect) focusMinutesSelect.disabled = isRunning;
+            saveState();
+            updateUi();
+        })();
+    </script>
+}

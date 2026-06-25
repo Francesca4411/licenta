@@ -1,0 +1,50 @@
+@model StudyManagement.Models.ViewModels.AiTutorPageViewModel
+
+@{
+    ViewData["Title"] = "AI Tutor";
+    ViewData["Breadcrumbs"] = new List<BreadcrumbItem> {
+        new("Dashboard", Url.Action("Index", "Home")!),
+        new("AI Tutor", null)
+    };
+}
+
+<header class="sp-titlebar">
+    <div>
+        <h1 class="sp-h1">AI Tutor <span class="sp-h1-icon" aria-hidden="true">🤖</span></h1>
+        <p class="sp-subtitle">Ask a question and get a clear, concise explanation.</p>
+    </div>
+</header>
+
+<section class="sp-panel sp-ai-panel" aria-label="AI tutor">
+    <div class="sp-panel-header sp-ai-panel-header">
+        <div class="sp-panel-badge sp-ai-panel-badge" aria-hidden="true">AI</div>
+        <h2 class="sp-panel-title">Study Assistant</h2>
+    </div>
+    <div class="sp-panel-body sp-ai-panel-body">
+        <p class="sp-ai-intro">How can I help you?</p>
+
+        <form asp-action="Index" asp-controller="AiTutor" method="post" class="sp-form sp-ai-form">
+            @Html.AntiForgeryToken()
+            <label class="sp-field sp-field-full">
+                <textarea asp-for="Question" rows="4" placeholder="Example: Explain photosynthesis in simple terms."></textarea>
+            </label>
+            <div class="sp-form-actions sp-ai-form-actions">
+                <button type="submit" class="sp-btn-primary">Send</button>
+            </div>
+        </form>
+
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+        {
+            <div class="sp-note" style="margin-top:14px; border-color:rgba(239,68,68,0.4); background:rgba(239,68,68,0.08);">
+                @Model.ErrorMessage
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Model.Answer))
+        {
+            <section class="sp-ai-response-wrap" aria-label="Assistant response">
+                <div class="sp-ai-response-box">@Html.Raw(string.IsNullOrWhiteSpace(Model.AnswerHtml) ? Model.Answer : Model.AnswerHtml)</div>
+            </section>
+        }
+    </div>
+</section>

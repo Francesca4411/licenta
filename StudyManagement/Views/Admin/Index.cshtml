@@ -1,0 +1,66 @@
+@model StudyManagement.Models.ViewModels.Admin.AdminUsersPageViewModel
+
+@{
+    ViewData["Title"] = "Users";
+    ViewData["Breadcrumbs"] = new List<BreadcrumbItem> {
+        new("Dashboard", Url.Action("Index", "Home")!),
+        new("Users", null)
+    };
+}
+
+<header class="sp-titlebar">
+    <div>
+        <h1 class="sp-h1">Users <span class="sp-h1-icon" aria-hidden="true">👥</span></h1>
+        <p class="sp-subtitle">Registered accounts (@Model.TotalCount)</p>
+    </div>
+</header>
+
+<div class="sp-panel">
+    <div class="sp-panel-header">
+        <div class="sp-panel-badge" aria-hidden="true">👥</div>
+        <h2 class="sp-panel-title">All users</h2>
+    </div>
+
+    <div class="sp-panel-body">
+        @if (Model.Users.Count == 0)
+        {
+            <div class="sp-sessions-empty">No users registered yet.</div>
+        }
+        else
+        {
+            <div class="sp-admin-users" aria-label="Users list">
+                @foreach (var user in Model.Users)
+                {
+                    <div class="sp-admin-user-row">
+                        <div class="sp-admin-user-main">
+                            <div class="sp-admin-user-email">@user.Email</div>
+                            <div class="sp-admin-user-meta">
+                                @if (user.Roles.Count == 0)
+                                {
+                                    <span class="sp-session-pill">User</span>
+                                }
+                                else
+                                {
+                                    @foreach (var role in user.Roles)
+                                    {
+                                        <span class="sp-session-pill sp-pill-alt">@role</span>
+                                    }
+                                }
+
+                                @if (user.EmailConfirmed)
+                                {
+                                    <span class="sp-muted">Email confirmed</span>
+                                }
+
+                                @if (user.IsLockedOut)
+                                {
+                                    <span class="sp-session-pill sp-danger-pill">Locked out</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>

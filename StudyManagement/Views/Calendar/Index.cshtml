@@ -1,0 +1,176 @@
+@model StudyManagement.Models.ViewModels.CalendarViewModel
+
+@{
+    ViewData["Title"] = "Calendar";
+    ViewData["ContentInnerClass"] = "sp-content-inner--full-bleed";
+    ViewData["Breadcrumbs"] = new List<BreadcrumbItem> {
+        new("Dashboard", Url.Action("Index", "Home")!),
+        new("Calendar", null)
+    };
+    var totalHeightPx = (Model.HourEndExclusive - Model.HourStart) * Model.HourHeightPx;
+    var today = DateTime.Today;
+}
+
+<header class="sp-titlebar">
+    <div>
+        <h1 class="sp-h1">Calendar <span class="sp-h1-icon" aria-hidden="true">🗓</span></h1>
+        <p class="sp-subtitle">View your study sessions</p>
+    </div>
+</header>
+
+<div class="sp-panel">
+    <div class="sp-panel-body">
+        <div class="sp-cal-toolbar">
+            <a class="sp-btn-secondary sp-cal-today" href="@Url.Action("Index", "Calendar", new { reference = today.ToString("yyyy-MM-dd") })">Today</a>
+
+            <div class="sp-cal-week-nav">
+                <a class="sp-cal-arrow" href="@Url.Action("Index", "Calendar", new { reference = Model.WeekStart.AddDays(-7).ToString("yyyy-MM-dd") })" aria-label="Previous week">‹</a>
+                <div class="sp-cal-week-pill">@Model.WeekLabel</div>
+                <a class="sp-cal-arrow" href="@Url.Action("Index", "Calendar", new { reference = Model.WeekStart.AddDays(7).ToString("yyyy-MM-dd") })" aria-label="Next week">›</a>
+            </div>
+
+            <button type="button" class="sp-btn-primary sp-cal-add-session" id="openAddSessionModal" aria-label="Add session">
+                <span aria-hidden="true">＋</span>
+                <span>Add Session</span>
+            </button>
+        </div>
+
+        <div class="sp-cal-daynames" style="grid-template-columns: 68px repeat(7, 1fr);">
+            <div class="sp-cal-daynames-spacer"></div>
+            @for (var i = 0; i < 7; i++)
+            {
+                var d = Model.WeekStart.AddDays(i);
+                var isToday = d.Date == today;
+                <div class="sp-cal-dayname @(isToday ? "sp-cal-dayname-today" : "")">
+                    <div class="sp-cal-daylabel">@d.ToString("dddd", System.Globalization.CultureInfo.GetCultureInfo("en-US"))</div>
+                    <div class="sp-cal-daynum">@d.Day</div>
+                </div>
+            }
+        </div>
+
+        <div class="sp-cal-grid" style="grid-template-columns: 68px 1fr;">
+            <div class="sp-cal-hours" style="height:@(totalHeightPx)px;">
+                @for (var h = Model.HourStart; h < Model.HourEndExclusive; h++)
+                {
+                    var top = (h - Model.HourStart) * Model.HourHeightPx;
+                    <div class="sp-cal-hour-label" style="top:@(top)px;">@($"{h:00}:00")</div>
+                }
+            </div>
+
+            <div class="sp-cal-days" style="height:@(totalHeightPx)px;">
+                @for (var day = 0; day < 7; day++)
+                {
+                    var daySessions = Model.Sessions.Where(s => s.DayIndex == day);
+                    var dayDate = Model.WeekStart.AddDays(day);
+                    <div class="sp-cal-daycol">
+                        @foreach (var ss in daySessions)
+                        {
+                            var tooltip = $"{ss.SubjectName} | {ss.ActivityLabel} | {ss.DurationMinutes} min | {dayDate.ToString("dddd, MMM dd, yyyy", System.Globalization.CultureInfo.GetCultureInfo("en-US"))}";
+                            var popoverSideClass = day >= 5 ? "sp-cal-session-pop-left" : "sp-cal-session-pop-right";
+                            var compactClass = (ss.WidthPct < 55 || ss.HeightPx < 74) ? "sp-cal-session-compact" : "";
+                            <div class="sp-cal-session @popoverSideClass @compactClass"
+                                 aria-label="@tooltip"
+                                 style="top:@(ss.TopPx)px; height:@(ss.HeightPx)px; left:@(ss.LeftPct)%; width:@(ss.WidthPct)%; background:@ss.SubjectColorBg; border-left: 6px solid @ss.SubjectColorHex;">
+                                <div class="sp-cal-session-title">@ss.SubjectName</div>
+                                <div class="sp-cal-session-meta">@ss.ActivityLabel • @ss.DurationMinutes min</div>
+                                <div class="sp-cal-session-popover" role="tooltip">
+                                    <div class="sp-cal-session-pop-title">@ss.SubjectName</div>
+                                    <div class="sp-cal-session-pop-meta">@ss.ActivityLabel • @ss.DurationMinutes min</div>
+                                    <div class="sp-cal-session-pop-date">@dayDate.ToString("dddd, MMM dd, yyyy", System.Globalization.CultureInfo.GetCultureInfo("en-US"))</div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="sp-modal-backdrop" id="addSessionModalBackdrop" hidden>
+    <div class="sp-modal" role="dialog" aria-modal="true" aria-labelledby="addSessionTitle">
+        <div class="sp-modal-header">
+            <h2 class="sp-modal-title" id="addSessionTitle">New Study Session</h2>
+            <button type="button" class="sp-modal-close" id="closeAddSessionModal" aria-label="Close">✕</button>
+        </div>
+
+        <form asp-action="AddStudySession" asp-controller="Calendar" method="post" class="sp-form">
+            @Html.AntiForgeryToken()
+
+            <input type="hidden" name="reference" value="@Model.WeekStart.ToString("yyyy-MM-dd")" />
+
+            <div class="sp-form-grid">
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Subject *</span>
+                    <select name="subjectId" required>
+                        @if (ViewBag.SubjectOptions != null)
+                        {
+                            foreach (var s in ViewBag.SubjectOptions)
+                            {
+                                <option value="@s.Id">@s.Name</option>
+                            }
+                        }
+                    </select>
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Start Date *</span>
+                    <input type="date" name="startDate" value="@Model.WeekStart.ToString("yyyy-MM-dd")" required />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Start Time *</span>
+                    <input type="time" name="startTime" value="10:00" required />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Duration (minutes) *</span>
+                    <input type="number" name="durationMinutes" min="1" max="600" value="60" required />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Activity Type *</span>
+                    <select name="activityLabel" required>
+                        <option value="review">review</option>
+                        <option value="practice">practice</option>
+                        <option value="theory">theory</option>
+                    </select>
+                </label>
+            </div>
+
+            <div class="sp-modal-actions">
+                <button type="button" class="sp-btn-secondary" id="cancelAddSessionModal">Cancel</button>
+                <button type="submit" class="sp-btn-primary">Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const backdrop = document.getElementById('addSessionModalBackdrop');
+            const openBtn = document.getElementById('openAddSessionModal');
+            const closeBtn = document.getElementById('closeAddSessionModal');
+            const cancelBtn = document.getElementById('cancelAddSessionModal');
+
+            function openModal() {
+                if (!backdrop) return;
+                backdrop.hidden = false;
+            }
+
+            function closeModal() {
+                if (!backdrop) return;
+                backdrop.hidden = true;
+            }
+
+            openBtn?.addEventListener('click', openModal);
+            closeBtn?.addEventListener('click', closeModal);
+            cancelBtn?.addEventListener('click', closeModal);
+            backdrop?.addEventListener('click', function (e) {
+                if (e.target === backdrop) closeModal();
+            });
+        })();
+    </script>
+}
+

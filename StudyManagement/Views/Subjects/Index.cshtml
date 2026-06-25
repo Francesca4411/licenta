@@ -1,0 +1,356 @@
+@{
+    ViewData["Title"] = "Subjects";
+    ViewData["Breadcrumbs"] = new List<BreadcrumbItem> {
+        new("Dashboard", Url.Action("Index", "Home")!),
+        new("Subjects", null)
+    };
+}
+
+@model IReadOnlyList<StudyManagement.Models.Subject>
+
+<header class="sp-titlebar">
+    <div>
+        <h1 class="sp-h1">Subjects <span class="sp-h1-icon" aria-hidden="true">📁</span></h1>
+        <p class="sp-subtitle">Manage your subjects and evaluations</p>
+    </div>
+    <button type="button" class="sp-btn-primary" id="openSubjectModal">
+        <span aria-hidden="true">＋</span>
+        <span>Add Subject</span>
+    </button>
+</header>
+
+@if (TempData["EvalError"] is string err && !string.IsNullOrWhiteSpace(err))
+{
+    <div class="sp-note" style="margin: 0 0 18px; border-color: rgba(239, 68, 68, 0.35); background: rgba(239, 68, 68, 0.10); color: #fecaca;">
+        <strong>Validation:</strong> @err
+    </div>
+}
+
+<section class="sp-subjects-grid" aria-label="Subjects list">
+    @foreach (var subject in Model)
+    {
+        <article class="sp-subject-card sp-tint-blue">
+            <header class="sp-subject-card-header">
+                <div class="sp-subject-title-row">
+                    <span class="sp-color-dot" style="background:@subject.ColorHex"></span>
+                    <div class="sp-subject-title">@subject.Name</div>
+                    <div class="sp-card-actions">
+                        <a class="sp-icon-btn" asp-action="EditSubject" asp-controller="Subjects" asp-route-id="@subject.Id" aria-label="Edit subject">✎</a>
+                        <form asp-action="DeleteSubject" asp-controller="Subjects" method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@subject.Id" />
+                            <button class="sp-icon-btn sp-danger" type="submit" aria-label="Delete subject">🗑</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="sp-subject-meta">
+                    <span aria-hidden="true">👨‍🏫</span>
+                    <span>@subject.Professor</span>
+                </div>
+                <div class="sp-credits"><span class="sp-credits-value">@subject.Credits credits</span></div>
+            </header>
+
+            <div class="sp-subject-desc">
+                @subject.Description
+            </div>
+
+            <div class="sp-evals">
+                <div class="sp-evals-head">
+                    <span class="sp-evals-title">Evaluations</span>
+                    <button type="button" class="sp-link-btn sp-eval-add-btn" data-subject-id="@subject.Id">
+                        <span aria-hidden="true">＋</span> Add
+                    </button>
+                </div>
+
+                @foreach (var ev in subject.Evaluations.OrderBy(e => e.Id))
+                {
+                    <div class="sp-eval-row">
+                        <div class="sp-eval-row-left">
+                            <span class="sp-mini-ic" aria-hidden="true">🗓</span>
+                            <div>
+                                <div class="sp-eval-row-title">@ev.Title</div>
+                                <div class="sp-eval-row-meta">@ev.DateLabel • @ev.WeightPercent%</div>
+                            </div>
+                        </div>
+                        <div class="sp-eval-actions">
+                            <button type="button"
+                                    class="sp-icon-btn sp-edit-eval-btn"
+                                    data-evalid="@ev.Id"
+                                    aria-label="Edit evaluation">✎</button>
+
+                            <form asp-action="DeleteEvaluation" asp-controller="Subjects" method="post" style="margin:0;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="evalId" value="@ev.Id" />
+                                <button class="sp-icon-btn sp-danger" type="submit" aria-label="Delete evaluation">🗑</button>
+                            </form>
+                        </div>
+                    </div>
+                }
+            </div>
+        </article>
+    }
+</section>
+
+<div class="sp-modal-backdrop" id="subjectModalBackdrop" hidden>
+    <div class="sp-modal" role="dialog" aria-modal="true" aria-labelledby="newSubjectTitle">
+        <div class="sp-modal-header">
+            <h2 class="sp-modal-title" id="newSubjectTitle">New Subject</h2>
+            <button type="button" class="sp-modal-close" id="closeSubjectModal" aria-label="Close">✕</button>
+        </div>
+
+        <form asp-action="AddSubject" asp-controller="Subjects" method="post" class="sp-form">
+            @Html.AntiForgeryToken()
+
+            <div class="sp-form-grid">
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Subject Name *</span>
+                    <input type="text" name="name" placeholder="Subject name" required />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Professor</span>
+                    <input type="text" name="professor" placeholder="Professor" />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Credits *</span>
+                    <input type="number" name="credits" placeholder="Credits" min="0" max="60" required />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Description</span>
+                    <textarea name="description" rows="3" placeholder="Short description"></textarea>
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Color *</span>
+                    <input type="hidden" name="colorHex" id="subjectColorHex" value="#7c3aed" />
+                    <div class="sp-color-row" id="subjectColorRow">
+                        <button type="button" data-color="#7c3aed" class="sp-color-dot-choice" aria-label="Purple"></button>
+                        <button type="button" data-color="#f97316" class="sp-color-dot-choice" aria-label="Orange"></button>
+                        <button type="button" data-color="#ef4444" class="sp-color-dot-choice" aria-label="Red"></button>
+                        <button type="button" data-color="#10b981" class="sp-color-dot-choice" aria-label="Green"></button>
+                        <button type="button" data-color="#f59e0b" class="sp-color-dot-choice" aria-label="Amber"></button>
+                        <button type="button" data-color="#8b5cf6" class="sp-color-dot-choice" aria-label="Purple"></button>
+                        <button type="button" data-color="#ec4899" class="sp-color-dot-choice" aria-label="Pink"></button>
+                        <button type="button" data-color="#06b6d4" class="sp-color-dot-choice" aria-label="Cyan"></button>
+                        <button type="button" data-color="#fb923c" class="sp-color-dot-choice" aria-label="Orange2"></button>
+                    </div>
+                </label>
+            </div>
+
+            <div class="sp-modal-actions">
+                <button type="button" class="sp-btn-secondary" id="cancelSubjectModal">Cancel</button>
+                <button type="submit" class="sp-btn-primary">
+                    Add
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="sp-modal-backdrop" id="evaluationModalBackdrop" hidden>
+    <div class="sp-modal" role="dialog" aria-modal="true" aria-labelledby="newEvaluationTitle">
+        <div class="sp-modal-header">
+            <h2 class="sp-modal-title" id="newEvaluationTitle">New Evaluation</h2>
+            <button type="button" class="sp-modal-close" id="closeEvaluationModal" aria-label="Close">✕</button>
+        </div>
+
+        <form asp-action="AddEvaluation" asp-controller="Subjects" method="post" class="sp-form">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="subjectId" id="evaluationSubjectId" value="" />
+
+            <div class="sp-form-grid">
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Title *</span>
+                    <input type="text" name="title" placeholder="Evaluation title" required />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Date *</span>
+                    <input type="date" name="dateLabel" required />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Weight Percent *</span>
+                    <input type="number" name="weightPercent" placeholder="40" min="0" max="100" required />
+                </label>
+            </div>
+
+            <div class="sp-modal-actions">
+                <button type="button" class="sp-btn-secondary" id="cancelEvaluationModal">Cancel</button>
+                <button type="submit" class="sp-btn-primary">Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="sp-modal-backdrop" id="evaluationEditModalBackdrop" hidden>
+    <div class="sp-modal" role="dialog" aria-modal="true" aria-labelledby="editEvaluationTitle">
+        <div class="sp-modal-header">
+            <h2 class="sp-modal-title" id="editEvaluationTitle">Edit Evaluation</h2>
+            <button type="button" class="sp-modal-close" id="closeEvaluationEditModal" aria-label="Close">✕</button>
+        </div>
+
+        <form asp-action="EditEvaluation" asp-controller="Subjects" method="post" class="sp-form">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="evalId" id="evaluationEditId" value="" />
+
+            <div class="sp-form-grid">
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Title *</span>
+                    <input type="text" name="title" id="evaluationEditTitle" placeholder="Evaluation title" required />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Date *</span>
+                    <input type="date" name="dateLabel" id="evaluationEditDate" required />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Weight Percent *</span>
+                    <input type="number" name="weightPercent" id="evaluationEditWeight" placeholder="40" min="0" max="100" required />
+                </label>
+            </div>
+
+            <div class="sp-modal-actions">
+                <button type="button" class="sp-btn-secondary" id="cancelEvaluationEditModal">Cancel</button>
+                <button type="submit" class="sp-btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    (function () {
+        const backdrop = document.getElementById('subjectModalBackdrop');
+        const openBtn = document.getElementById('openSubjectModal');
+        const closeBtn = document.getElementById('closeSubjectModal');
+        const cancelBtn = document.getElementById('cancelSubjectModal');
+        const colorHidden = document.getElementById('subjectColorHex');
+        const colorButtons = document.querySelectorAll('#subjectColorRow .sp-color-dot-choice');
+
+        function openModal() {
+            if (!backdrop) return;
+            backdrop.hidden = false;
+        }
+
+        function closeModal() {
+            if (!backdrop) return;
+            backdrop.hidden = true;
+        }
+
+        openBtn?.addEventListener('click', openModal);
+        closeBtn?.addEventListener('click', closeModal);
+        cancelBtn?.addEventListener('click', closeModal);
+        backdrop?.addEventListener('click', function (e) {
+            if (e.target === backdrop) closeModal();
+        });
+
+        function setSelected(btn) {
+            const color = btn.getAttribute('data-color');
+            if (!color) return;
+            if (colorHidden) colorHidden.value = color;
+            colorButtons.forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+        }
+
+        // Default selection (matches hidden input value)
+        const initial = '#7c3aed';
+        const initialBtn = document.querySelector('#subjectColorRow .sp-color-dot-choice[data-color="' + initial + '"]');
+        if (initialBtn) setSelected(initialBtn);
+        else if (colorButtons.length) setSelected(colorButtons[0]);
+
+        colorButtons.forEach(btn => {
+            btn.style.background = btn.getAttribute('data-color');
+            btn.style.color = btn.getAttribute('data-color');
+            btn.addEventListener('click', () => setSelected(btn));
+        });
+    })();
+
+    (function () {
+        const backdrop = document.getElementById('evaluationModalBackdrop');
+        const openBtns = document.querySelectorAll('.sp-eval-add-btn');
+        const closeBtn = document.getElementById('closeEvaluationModal');
+        const cancelBtn = document.getElementById('cancelEvaluationModal');
+        const subjectHidden = document.getElementById('evaluationSubjectId');
+
+        function openModal(subjectId) {
+            if (!backdrop) return;
+            if (subjectHidden) subjectHidden.value = subjectId || '';
+            backdrop.hidden = false;
+        }
+
+        function closeModal() {
+            if (!backdrop) return;
+            backdrop.hidden = true;
+        }
+
+        openBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const subjectId = btn.getAttribute('data-subject-id');
+                openModal(subjectId);
+            });
+        });
+
+        closeBtn?.addEventListener('click', closeModal);
+        cancelBtn?.addEventListener('click', closeModal);
+        backdrop?.addEventListener('click', function (e) {
+            if (e.target === backdrop) closeModal();
+        });
+    })();
+
+    (function () {
+        const backdrop = document.getElementById('evaluationEditModalBackdrop');
+        const openBtns = document.querySelectorAll('.sp-edit-eval-btn');
+        const closeBtn = document.getElementById('closeEvaluationEditModal');
+        const cancelBtn = document.getElementById('cancelEvaluationEditModal');
+
+        const evalIdHidden = document.getElementById('evaluationEditId');
+        const titleInput = document.getElementById('evaluationEditTitle');
+        const dateInput = document.getElementById('evaluationEditDate');
+        const weightInput = document.getElementById('evaluationEditWeight');
+
+        function closeModal() {
+            if (!backdrop) return;
+            backdrop.hidden = true;
+        }
+
+        function openModal(evalId) {
+            if (!backdrop) return;
+            if (!evalId) return;
+
+            fetch('@Url.Action("GetEvaluation", "Subjects")?evalId=' + encodeURIComponent(evalId))
+                .then(r => {
+                    if (!r.ok) throw new Error('Failed to load evaluation');
+                    return r.json();
+                })
+                .then(data => {
+                    if (evalIdHidden) evalIdHidden.value = data.id;
+                    if (titleInput) titleInput.value = data.title || '';
+                    if (dateInput) dateInput.value = data.dateIso || '';
+                    if (weightInput) weightInput.value = data.weightPercent ?? '';
+                    backdrop.hidden = false;
+                })
+                .catch(() => {
+                    alert('Could not load evaluation details.');
+                });
+        }
+
+        openBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const evalId = btn.getAttribute('data-evalid');
+                openModal(evalId);
+            });
+        });
+
+        closeBtn?.addEventListener('click', closeModal);
+        cancelBtn?.addEventListener('click', closeModal);
+        backdrop?.addEventListener('click', function (e) {
+            if (e.target === backdrop) closeModal();
+        });
+    })();
+</script>
+}
+

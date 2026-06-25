@@ -1,0 +1,22 @@
+@{
+    ViewData["Title"] = "Welcome";
+    Layout = "~/Views/Shared/_LayoutLanding.cshtml";
+}
+
+<div class="sp-landing">
+    <div class="sp-landing-hero-card">
+        <p class="sp-landing-kicker">Study management</p>
+        <h1 class="sp-landing-title">Plan smarter. <span class="sp-landing-title-accent">Study with focus.</span></h1>
+        <p class="sp-landing-lead">
+            Organize subjects, schedule sessions, track Pomodoros, and see your progress — in one place.
+            Sign in to open your dashboard, or create an account to get started.
+        </p>
+        <div class="sp-landing-actions">
+            <a asp-controller="Account" asp-action="Login" asp-route-returnUrl="@Url.Action("Index", "Home")" class="sp-btn-primary sp-landing-btn-primary">Log in</a>
+            <a asp-controller="Account" asp-action="Register" class="sp-btn-secondary sp-landing-btn-secondary">Create account</a>
+        </div>
+    </div>
+    <p class="sp-landing-foot">
+        <a asp-controller="Home" asp-action="Privacy" class="sp-landing-link">Privacy</a>
+    </p>
+</div>

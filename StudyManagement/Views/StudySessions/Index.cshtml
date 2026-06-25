@@ -1,0 +1,439 @@
+@model StudyManagement.Models.ViewModels.StudySessionsPageViewModel
+@using System.Globalization
+
+@{
+    ViewData["Title"] = "Study Sessions";
+    ViewData["Breadcrumbs"] = new List<BreadcrumbItem> {
+        new("Dashboard", Url.Action("Index", "Home")!),
+        new("Study Sessions", null)
+    };
+    var todayIso = DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+}
+
+<header class="sp-titlebar">
+    <div>
+        <h1 class="sp-h1">Study Sessions <span class="sp-h1-icon" aria-hidden="true">⏱</span></h1>
+        <p class="sp-subtitle">Plan and log your study time</p>
+    </div>
+    <button type="button" class="sp-btn-primary" id="openAddStudySessionModal">
+        <span aria-hidden="true">＋</span>
+        <span>Add Session</span>
+    </button>
+</header>
+
+<div class="sp-panel">
+    <div class="sp-panel-header">
+        <div class="sp-panel-badge" aria-hidden="true">⏱</div>
+        <h2 class="sp-panel-title">Planned / Completed</h2>
+    </div>
+
+    <div class="sp-panel-body">
+        <div class="sp-sessions-tabs" role="tablist" aria-label="Study Sessions tabs">
+            <a class="sp-sessions-tab @(Model.Tab == "planned" ? "active" : "")"
+               href="@Url.Action("Index", "StudySessions", new { tab = "planned" })"
+               role="tab"
+               aria-selected="@(Model.Tab == "planned" ? "true" : "false")">
+                Planned
+            </a>
+            <a class="sp-sessions-tab @(Model.Tab == "completed" ? "active" : "")"
+               href="@Url.Action("Index", "StudySessions", new { tab = "completed" })"
+               role="tab"
+               aria-selected="@(Model.Tab == "completed" ? "true" : "false")">
+                Completed
+            </a>
+        </div>
+
+        @if (Model.Sessions.Count == 0)
+        {
+            <div class="sp-sessions-empty">No sessions found.</div>
+        }
+        else
+        {
+            <div class="sp-sessions-list" aria-label="Sessions list">
+                @foreach (var s in Model.Sessions)
+                {
+                    var statusText = s.IsCompleted
+                        ? $"Completed{(s.ActualDurationMinutes.HasValue ? $" • {s.ActualDurationMinutes.Value} min" : "")}"
+                        : $"Planned • {s.DurationMinutes} min";
+
+                    var displayStartAt = s.ActualStartAt ?? s.StartAt;
+
+                    <div class="sp-session-row" style="background:@s.SubjectColorBg;">
+                        <div class="sp-session-bar" style="background:@s.SubjectColorHex;"></div>
+
+                        <div class="sp-session-main">
+                            <div class="sp-session-top">
+                                <div class="sp-session-subject">@s.SubjectName</div>
+                                <div class="sp-session-date">
+                                    @displayStartAt.ToString("dd MMM yyyy", CultureInfo.InvariantCulture)
+                                    <span class="sp-muted">•</span>
+                                    @displayStartAt.ToString("HH:mm", CultureInfo.InvariantCulture)
+                                </div>
+                            </div>
+
+                            <div class="sp-session-meta">
+                                <span class="sp-session-pill">@s.ActivityLabel</span>
+                                <span class="sp-session-status">@statusText</span>
+
+                                @if (s.IsCompleted && !string.IsNullOrWhiteSpace(s.DifficultyLabel))
+                                {
+                                    <span class="sp-session-pill sp-pill-alt">@s.DifficultyLabel</span>
+                                }
+                            </div>
+
+                            @if (!s.IsCompleted)
+                            {
+                                <div class="sp-session-actions">
+                                    <button type="button"
+                                            class="sp-icon-btn sp-icon-ok open-complete-btn"
+                                            title="Complete / update"
+                                            aria-label="Complete / update"
+                                            data-session-id="@s.Id">
+                                        ✓
+                                    </button>
+
+                                    <button type="button"
+                                            class="sp-icon-btn open-edit-btn"
+                                            title="Edit"
+                                            aria-label="Edit"
+                                            data-session-id="@s.Id">
+                                        ✎
+                                    </button>
+
+                                    <form asp-action="DeleteStudySessionForStudySessions"
+                                          asp-controller="StudySessions"
+                                          method="post"
+                                          class="sp-inline-form"
+                                          id="deleteStudySessionForm-@s.Id">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="sessionId" value="@s.Id" />
+                                    </form>
+
+                                    <button type="button"
+                                            class="sp-icon-btn sp-danger open-delete-btn"
+                                            title="Delete"
+                                            aria-label="Delete"
+                                            data-form-id="deleteStudySessionForm-@s.Id">
+                                        🗑
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+<div class="sp-modal-backdrop" id="addStudySessionModalBackdrop" hidden>
+    <div class="sp-modal" role="dialog" aria-modal="true" aria-labelledby="addStudySessionTitle">
+        <div class="sp-modal-header">
+            <h2 class="sp-modal-title" id="addStudySessionTitle">New Study Session</h2>
+            <button type="button" class="sp-modal-close" id="closeAddStudySessionModal" aria-label="Close">✕</button>
+        </div>
+
+        <form asp-action="AddStudySessionForStudySessions" asp-controller="StudySessions" method="post" class="sp-form">
+            @Html.AntiForgeryToken()
+
+            <div class="sp-form-grid">
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Subject *</span>
+                    <select name="subjectId" required>
+                        @foreach (var opt in Model.SubjectOptions)
+                        {
+                            <option value="@opt.Id">@opt.Name</option>
+                        }
+                    </select>
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Start Date *</span>
+                    <input type="date" name="startDate" value="@todayIso" required />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Start Time *</span>
+                    <input type="time" name="startTime" value="10:00" required />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Duration (minutes) *</span>
+                    <input type="number" name="durationMinutes" min="1" max="600" value="60" required />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Activity Type *</span>
+                    <select name="activityLabel" required>
+                        <option value="review">review</option>
+                        <option value="practice">practice</option>
+                        <option value="theory">theory</option>
+                    </select>
+                </label>
+            </div>
+
+            <div class="sp-modal-actions">
+                <button type="button" class="sp-btn-secondary" id="cancelAddStudySessionModal">Cancel</button>
+                <button type="submit" class="sp-btn-primary">Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="sp-modal-backdrop" id="editStudySessionModalBackdrop" hidden>
+    <div class="sp-modal" role="dialog" aria-modal="true" aria-labelledby="editStudySessionTitle">
+        <div class="sp-modal-header">
+            <h2 class="sp-modal-title" id="editStudySessionTitle">Edit Study Session</h2>
+            <button type="button" class="sp-modal-close" id="closeEditStudySessionModal" aria-label="Close">✕</button>
+        </div>
+
+        <form asp-action="EditStudySessionForStudySessions" asp-controller="StudySessions" method="post" class="sp-form" id="editStudySessionForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="sessionId" id="editSessionId" value="" />
+
+            <div class="sp-form-grid">
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Subject *</span>
+                    <select name="subjectId" id="editSubjectId" required>
+                        @foreach (var opt in Model.SubjectOptions)
+                        {
+                            <option value="@opt.Id">@opt.Name</option>
+                        }
+                    </select>
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Start Date *</span>
+                    <input type="date" name="startDate" id="editStartDate" required />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Start Time *</span>
+                    <input type="time" name="startTime" id="editStartTime" required />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Duration (minutes) *</span>
+                    <input type="number" name="durationMinutes" id="editDurationMinutes" min="1" max="600" required />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Activity Type *</span>
+                    <select name="activityLabel" id="editActivityLabel" required>
+                        <option value="review">review</option>
+                        <option value="practice">practice</option>
+                        <option value="theory">theory</option>
+                    </select>
+                </label>
+            </div>
+
+            <div class="sp-modal-actions">
+                <button type="button" class="sp-btn-secondary" id="cancelEditStudySessionModal">Cancel</button>
+                <button type="submit" class="sp-btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="sp-modal-backdrop" id="completeStudySessionModalBackdrop" hidden>
+    <div class="sp-modal" role="dialog" aria-modal="true" aria-labelledby="completeStudySessionTitle">
+        <div class="sp-modal-header">
+            <h2 class="sp-modal-title" id="completeStudySessionTitle">Complete Study Session</h2>
+            <button type="button" class="sp-modal-close" id="closeCompleteStudySessionModal" aria-label="Close">✕</button>
+        </div>
+
+        <form asp-action="CompleteStudySessionForStudySessions" asp-controller="StudySessions" method="post" class="sp-form" id="completeStudySessionForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="sessionId" id="completeSessionId" value="" />
+
+            <div class="sp-form-grid">
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Actual Date *</span>
+                    <input type="date" name="actualDate" id="completeActualDate" required />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Actual Time *</span>
+                    <input type="time" name="actualTime" id="completeActualTime" required />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Actual Study Time (minutes) *</span>
+                    <input type="number" name="actualDurationMinutes" id="completeActualDurationMinutes" min="1" max="600" required />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Difficulty *</span>
+                    <select name="difficultyLabel" id="completeDifficultyLabel" required>
+                        <option value="low">low</option>
+                        <option value="medium">medium</option>
+                        <option value="high">high</option>
+                    </select>
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Notes</span>
+                    <textarea name="notes" id="completeNotes" rows="4" placeholder="Short notes (optional)"></textarea>
+                </label>
+            </div>
+
+            <div class="sp-modal-actions">
+                <button type="button" class="sp-btn-secondary" id="cancelCompleteStudySessionModal">Cancel</button>
+                <button type="submit" class="sp-btn-primary">Complete</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="sp-modal-backdrop" id="deleteStudySessionModalBackdrop" hidden>
+    <div class="sp-modal sp-modal-sm" role="dialog" aria-modal="true" aria-labelledby="deleteStudySessionTitle">
+        <div class="sp-modal-header">
+            <h2 class="sp-modal-title" id="deleteStudySessionTitle">Delete study session</h2>
+            <button type="button" class="sp-modal-close" id="closeDeleteStudySessionModal" aria-label="Close">✕</button>
+        </div>
+
+        <div style="color:var(--sp-muted); font-weight:800; margin-top: 6px;">
+            Are you sure you want to delete this study session?
+        </div>
+
+        <div class="sp-modal-actions">
+            <button type="button" class="sp-btn-secondary" id="cancelDeleteStudySessionModal">Cancel</button>
+            <button type="button" class="sp-btn-primary" id="confirmDeleteStudySessionBtn">Delete</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            function bindModal(backdropId, openBtnId, closeBtnId, cancelBtnId) {
+                const backdrop = document.getElementById(backdropId);
+                const openBtn = openBtnId ? document.getElementById(openBtnId) : null;
+                const closeBtn = document.getElementById(closeBtnId);
+                const cancelBtn = document.getElementById(cancelBtnId);
+
+                function openModal() {
+                    if (!backdrop) return;
+                    backdrop.hidden = false;
+                }
+
+                function closeModal() {
+                    if (!backdrop) return;
+                    backdrop.hidden = true;
+                }
+
+                if (openBtn) openBtn.addEventListener('click', openModal);
+                closeBtn?.addEventListener('click', closeModal);
+                cancelBtn?.addEventListener('click', closeModal);
+
+                backdrop?.addEventListener('click', function (e) {
+                    if (e.target === backdrop) closeModal();
+                });
+
+                return { openModal, closeModal, backdrop };
+            }
+
+            const addModal = bindModal(
+                'addStudySessionModalBackdrop',
+                'openAddStudySessionModal',
+                'closeAddStudySessionModal',
+                'cancelAddStudySessionModal'
+            );
+
+            const editModal = bindModal(
+                'editStudySessionModalBackdrop',
+                null,
+                'closeEditStudySessionModal',
+                'cancelEditStudySessionModal'
+            );
+
+            const completeModal = bindModal(
+                'completeStudySessionModalBackdrop',
+                null,
+                'closeCompleteStudySessionModal',
+                'cancelCompleteStudySessionModal'
+            );
+
+            let deleteFormToSubmit = null;
+            const deleteBackdrop = document.getElementById('deleteStudySessionModalBackdrop');
+            const closeDeleteBtn = document.getElementById('closeDeleteStudySessionModal');
+            const cancelDeleteBtn = document.getElementById('cancelDeleteStudySessionModal');
+            const confirmDeleteBtn = document.getElementById('confirmDeleteStudySessionBtn');
+
+            function openDeleteModal() {
+                if (!deleteBackdrop) return;
+                deleteBackdrop.hidden = false;
+            }
+
+            function closeDeleteModal() {
+                if (!deleteBackdrop) return;
+                deleteBackdrop.hidden = true;
+                deleteFormToSubmit = null;
+            }
+
+            document.querySelectorAll('.open-delete-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const formId = btn.getAttribute('data-form-id');
+                    deleteFormToSubmit = formId ? document.getElementById(formId) : null;
+                    openDeleteModal();
+                });
+            });
+
+            closeDeleteBtn?.addEventListener('click', closeDeleteModal);
+            cancelDeleteBtn?.addEventListener('click', closeDeleteModal);
+
+            deleteBackdrop?.addEventListener('click', function (e) {
+                if (e.target === deleteBackdrop) closeDeleteModal();
+            });
+
+            confirmDeleteBtn?.addEventListener('click', function () {
+                if (deleteFormToSubmit) deleteFormToSubmit.submit();
+            });
+
+            async function fetchSession(sessionId) {
+                const res = await fetch('@Url.Action("GetStudySessionForStudySessions", "StudySessions")' + '?sessionId=' + sessionId, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!res.ok) throw new Error('Failed to load session');
+                return await res.json();
+            }
+
+            document.querySelectorAll('.open-edit-btn').forEach(function (btn) {
+                btn.addEventListener('click', async function () {
+                    const sessionId = btn.getAttribute('data-session-id');
+                    if (!sessionId) return;
+
+                    const data = await fetchSession(sessionId);
+
+                    document.getElementById('editSessionId').value = data.id;
+                    document.getElementById('editSubjectId').value = data.subjectId;
+                    document.getElementById('editStartDate').value = data.startDateIso;
+                    document.getElementById('editStartTime').value = data.startTime;
+                    document.getElementById('editDurationMinutes').value = data.durationMinutes;
+                    document.getElementById('editActivityLabel').value = data.activityLabel || 'review';
+
+                    editModal.openModal();
+                });
+            });
+
+            document.querySelectorAll('.open-complete-btn').forEach(function (btn) {
+                btn.addEventListener('click', async function () {
+                    const sessionId = btn.getAttribute('data-session-id');
+                    if (!sessionId) return;
+
+                    const data = await fetchSession(sessionId);
+
+                    document.getElementById('completeSessionId').value = data.id;
+                    document.getElementById('completeActualDate').value = data.actualStartDateIso || data.startDateIso;
+                    document.getElementById('completeActualTime').value = data.actualStartTime || data.startTime;
+                    document.getElementById('completeActualDurationMinutes').value = data.actualDurationMinutes ?? data.durationMinutes ?? 1;
+                    document.getElementById('completeDifficultyLabel').value = data.difficultyLabel || 'medium';
+                    document.getElementById('completeNotes').value = data.notes || '';
+
+                    completeModal.openModal();
+                });
+            });
+        })();
+    </script>
+}
+

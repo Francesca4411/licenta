@@ -1,0 +1,49 @@
+@model StudyManagement.Models.ViewModels.Auth.LoginViewModel
+@{
+    ViewData["Title"] = "Login";
+    Layout = "~/Views/Shared/_LayoutLanding.cshtml";
+    var returnUrl = ViewData["ReturnUrl"] as string;
+}
+
+<div class="sp-panel sp-auth-panel">
+    <div class="sp-panel-header">
+        <h2 class="sp-panel-title">Sign in</h2>
+    </div>
+    <div class="sp-panel-body">
+        <form asp-action="Login" method="post" class="sp-form">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="returnUrl" value="@returnUrl" />
+            <div asp-validation-summary="ModelOnly" class="sp-note"></div>
+
+            <label class="sp-field">
+                <span class="sp-label">Email</span>
+                <input asp-for="Email" type="email" />
+                <span asp-validation-for="Email" class="sp-field-error"></span>
+            </label>
+
+            <label class="sp-field">
+                <span class="sp-label">Password</span>
+                <input asp-for="Password" type="password" />
+                <span asp-validation-for="Password" class="sp-field-error"></span>
+            </label>
+
+            <label class="sp-field" style="flex-direction:row; align-items:center; gap:8px;">
+                <input asp-for="RememberMe" type="checkbox" />
+                <span class="sp-label">Remember me</span>
+            </label>
+
+            <div class="sp-form-actions">
+                <button type="submit" class="sp-btn-primary">Login</button>
+            </div>
+        </form>
+
+        <p style="margin-top:12px;">
+            No account yet? <a asp-controller="Account" asp-action="Register">Register</a>
+        </p>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <partial name="_ValidationScriptsPartial" />
+}

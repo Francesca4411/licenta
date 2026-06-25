@@ -1,0 +1,377 @@
+@model StudyManagement.Models.ViewModels.ProfilePageViewModel
+@using System.Linq
+@using System.Text.Json
+
+@{
+    ViewData["Title"] = "Profile";
+    ViewData["Breadcrumbs"] = new List<BreadcrumbItem> {
+        new("Dashboard", Url.Action("Index", "Home")!),
+        new("Profile", null)
+    };
+    var p = Model.Profile;
+    var subjectChartJson = Model.Statistics.HoursBySubject.Count == 0
+        ? "[]"
+        : JsonSerializer.Serialize(
+            Model.Statistics.HoursBySubject.Select(x => new { label = x.SubjectName, minutes = x.Minutes }),
+            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+}
+
+<div class="sp-page-airy">
+<header class="sp-titlebar">
+    <div>
+        <h1 class="sp-h1">Profile <span class="sp-h1-icon" aria-hidden="true">👤</span></h1>
+        <p class="sp-subtitle">Your account and study overview</p>
+    </div>
+</header>
+
+@if (TempData["ProfileSaved"] is string ok)
+{
+    <div class="sp-note" style="margin-bottom:1rem; border-color:rgba(16,185,129,0.45); background:rgba(16,185,129,0.08); color:var(--sp-text);">
+        @ok
+    </div>
+}
+
+@if (TempData["ProfileError"] is string err)
+{
+    <div class="sp-note" style="margin-bottom:1rem; border-color:rgba(239,68,68,0.45); background:rgba(239,68,68,0.08); color:var(--sp-text);">
+        @err
+    </div>
+}
+
+<section class="sp-profile-hero-card sp-panel" aria-label="Profile summary">
+    <div class="sp-profile-hero-inner">
+        <div class="sp-profile-photo-wrap">
+            @if (!string.IsNullOrWhiteSpace(p.AvatarPhotoPath))
+            {
+                <img class="sp-profile-photo-img" src="@p.AvatarPhotoPath" alt="" width="96" height="96" />
+            }
+            else
+            {
+                <div class="sp-profile-avatar sp-profile-avatar-lg" style="background: @ProfileUiHelper.GetAvatarGradient(p.FullName)" aria-hidden="true">
+                    @ProfileUiHelper.GetInitials(p.FullName)
+                </div>
+            }
+            <form asp-action="UploadAvatar" asp-controller="Profile" method="post" enctype="multipart/form-data" class="sp-profile-upload-form">
+                @Html.AntiForgeryToken()
+                <label class="sp-profile-upload-btn" title="Upload photo">
+                    <span aria-hidden="true">＋</span>
+                    <input type="file" name="file" accept="image/jpeg,image/png,image/webp" class="sp-profile-file-input" />
+                </label>
+            </form>
+            @if (!string.IsNullOrWhiteSpace(p.AvatarPhotoPath))
+            {
+                <form asp-action="RemoveAvatar" asp-controller="Profile" method="post" class="sp-profile-remove-form">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="sp-profile-remove-btn" title="Remove photo">✕</button>
+                </form>
+            }
+        </div>
+        <div class="sp-profile-hero-text">
+            <h2 class="sp-profile-display-name">@(string.IsNullOrWhiteSpace(p.FullName) ? "Student" : p.FullName)</h2>
+            <p class="sp-profile-display-email">@(string.IsNullOrWhiteSpace(p.Email) ? "—" : p.Email)</p>
+        </div>
+    </div>
+</section>
+
+<section class="sp-profile-metrics" aria-label="Study stats">
+    <div class="sp-profile-metric sp-profile-metric-amber">
+        <div class="sp-profile-metric-top">
+            <span class="sp-profile-metric-emoji" aria-hidden="true">👀</span>
+            <span class="sp-profile-metric-label">Planned (next 7 days)</span>
+        </div>
+        <div class="sp-profile-metric-value">@Model.PendingUpcoming7Days</div>
+        <div class="sp-profile-metric-sub">Not completed yet</div>
+    </div>
+    <div class="sp-profile-metric sp-profile-metric-rose">
+        <div class="sp-profile-metric-top">
+            <span class="sp-profile-metric-emoji" aria-hidden="true">⚠️</span>
+            <span class="sp-profile-metric-label">Overdue sessions</span>
+        </div>
+        <div class="sp-profile-metric-value">@Model.OverdueSessions</div>
+        <div class="sp-profile-metric-sub">Total</div>
+    </div>
+    <div class="sp-profile-metric sp-profile-metric-teal">
+        <div class="sp-profile-metric-top">
+            <span class="sp-profile-metric-emoji" aria-hidden="true">👍</span>
+            <span class="sp-profile-metric-label">Completed</span>
+        </div>
+        <div class="sp-profile-metric-value">@Model.CompletedLast7Days</div>
+        <div class="sp-profile-metric-sub">Last 7 days</div>
+    </div>
+    <div class="sp-profile-metric sp-profile-metric-violet">
+        <div class="sp-profile-metric-top">
+            <span class="sp-profile-metric-emoji" aria-hidden="true">🔥</span>
+            <span class="sp-profile-metric-label">Pomodoro streak</span>
+        </div>
+        <div class="sp-profile-metric-value">@Model.PomodoroStreakDays</div>
+        <div class="sp-profile-metric-sub">Days</div>
+    </div>
+</section>
+
+<section class="sp-profile-statistics" aria-label="Study statistics and analytics">
+    <h2 class="sp-profile-section-title">Statistics</h2>
+    <p class="sp-profile-section-lead">Monthly progress, hours by subject, and how you spend study time.</p>
+
+    <div class="sp-stats" aria-label="Monthly stats">
+        <div class="sp-stat sp-grad-purple">
+            <div class="sp-stat-top">
+                <div class="sp-stat-title">Hours This Month</div>
+                <div class="sp-stat-icon" aria-hidden="true">⏱</div>
+            </div>
+            <div class="sp-stat-value">@Model.Statistics.HoursThisMonthLabel</div>
+            <div class="sp-stat-hint">Study sessions + Pomodoro (UTC month)</div>
+        </div>
+        <div class="sp-stat sp-grad-magenta">
+            <div class="sp-stat-top">
+                <div class="sp-stat-title">Completed Sessions</div>
+                <div class="sp-stat-icon" aria-hidden="true">✓</div>
+            </div>
+            <div class="sp-stat-value">@Model.Statistics.CompletedSessionsThisMonth</div>
+            <div class="sp-stat-hint">Study sessions marked completed (this month)</div>
+        </div>
+        <div class="sp-stat sp-grad-indigo">
+            <div class="sp-stat-top">
+                <div class="sp-stat-title">Completion Rate</div>
+                <div class="sp-stat-icon" aria-hidden="true">%</div>
+            </div>
+            <div class="sp-stat-value">@Model.Statistics.CompletionRatePercent%</div>
+            <div class="sp-stat-hint">Completed / total planned (this month)</div>
+        </div>
+        <div class="sp-stat sp-grad-pinkred">
+            <div class="sp-stat-top">
+                <div class="sp-stat-title">Productivity Score</div>
+                <div class="sp-stat-icon" aria-hidden="true">★</div>
+            </div>
+            <div class="sp-stat-value">@Model.Statistics.ProductivityScore</div>
+            <div class="sp-stat-hint">Based on Pomodoros &amp; completed study</div>
+        </div>
+    </div>
+
+    <div class="sp-grid-2 sp-profile-statistics-charts" aria-label="Charts">
+        <div class="sp-panel">
+            <div class="sp-panel-header">
+                <div class="sp-panel-badge" aria-hidden="true" style="background: linear-gradient(135deg, #3b82f6, #22c55e);">📊</div>
+                <h2 class="sp-panel-title">Hours by Subject</h2>
+            </div>
+            <div class="sp-panel-body">
+                @if (Model.Statistics.HoursBySubject.Count == 0)
+                {
+                    <div class="sp-note" style="color:var(--sp-muted); font-weight:700;">No study sessions yet — add sessions in Calendar or Study Sessions.</div>
+                }
+                else
+                {
+                    <p class="sp-chart-caption">Total planned study time per subject (all sessions in database).</p>
+                    <div class="sp-chart-wrap">
+                        <canvas id="chartSubjects" aria-label="Hours by subject chart"></canvas>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="sp-panel">
+            <div class="sp-panel-header">
+                <div class="sp-panel-badge" aria-hidden="true" style="background: linear-gradient(135deg, #f59e0b, #ec4899);">🎯</div>
+                <h2 class="sp-panel-title">Time Distribution</h2>
+            </div>
+            <div class="sp-panel-body">
+                @if (Model.Statistics.ActivityDistribution.Count == 0)
+                {
+                    <div class="sp-note" style="color:var(--sp-muted); font-weight:700;">No activity data yet.</div>
+                }
+                else
+                {
+                    <div class="sp-stat-chart" aria-label="Time by activity type">
+                        @foreach (var row in Model.Statistics.ActivityDistribution)
+                        {
+                            <div class="sp-stat-bar-row">
+                                <div class="sp-stat-bar-label" title="@row.Label">@row.Label</div>
+                                <div class="sp-stat-bar-track">
+                                    <div class="sp-stat-bar-fill sp-stat-bar-fill-activity" style="width:@(row.SharePercent)%"></div>
+                                </div>
+                                <div class="sp-stat-bar-value">@row.SharePercent% · @row.Minutes min</div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</section>
+
+<div class="sp-panel" id="personal-info">
+    <div class="sp-panel-header">
+        <div class="sp-panel-badge" aria-hidden="true" style="background: linear-gradient(135deg, #7c3aed, #a855f7);">👤</div>
+        <h2 class="sp-panel-title">Personal information</h2>
+    </div>
+    <div class="sp-panel-body">
+        <form asp-action="Index" asp-controller="Profile" method="post" class="sp-form">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Profile.Id" />
+
+            <div asp-validation-summary="ModelOnly" class="sp-note sp-validation-summary" role="alert"></div>
+
+            <div class="sp-form-grid">
+                <label class="sp-field">
+                    <span class="sp-label">@Html.DisplayNameFor(m => m.Profile.FullName)</span>
+                    <input asp-for="Profile.FullName" autocomplete="name" />
+                    <span asp-validation-for="Profile.FullName" class="sp-field-error"></span>
+                </label>
+
+                <label class="sp-field">
+                    <span class="sp-label">@Html.DisplayNameFor(m => m.Profile.Email)</span>
+                    <input asp-for="Profile.Email" type="email" autocomplete="email" />
+                    <span asp-validation-for="Profile.Email" class="sp-field-error"></span>
+                </label>
+
+                <label class="sp-field">
+                    <span class="sp-label">@Html.DisplayNameFor(m => m.Profile.Faculty)</span>
+                    <input asp-for="Profile.Faculty" />
+                    <span asp-validation-for="Profile.Faculty" class="sp-field-error"></span>
+                </label>
+
+                <label class="sp-field">
+                    <span class="sp-label">@Html.DisplayNameFor(m => m.Profile.AcademicYear)</span>
+                    <input asp-for="Profile.AcademicYear" placeholder="e.g. 2025–2026" />
+                    <span asp-validation-for="Profile.AcademicYear" class="sp-field-error"></span>
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">@Html.DisplayNameFor(m => m.Profile.WeeklyGoalHours)</span>
+                    <input asp-for="Profile.WeeklyGoalHours" type="number" min="1" max="80" step="1" />
+                    <span class="sp-field-hint">Targets total study time (sessions + Pomodoro) for the current week on your dashboard.</span>
+                    <span asp-validation-for="Profile.WeeklyGoalHours" class="sp-field-error"></span>
+                </label>
+            </div>
+
+            <div class="sp-form-actions">
+                <button type="submit" class="sp-btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            document.querySelectorAll('.sp-profile-file-input').forEach(function (input) {
+                input.addEventListener('change', function () {
+                    if (input.files && input.files.length) input.form.submit();
+                });
+            });
+        })();
+    </script>
+    @if (Model.Statistics.HoursBySubject.Count > 0)
+    {
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+        <script>
+            (function () {
+                const data = @Html.Raw(subjectChartJson);
+                const ctx = document.getElementById('chartSubjects');
+                if (!ctx || typeof Chart === 'undefined') return;
+
+                function themeColors() {
+                    var shell = document.querySelector('.sp-shell');
+                    var el = shell || document.documentElement;
+                    var cs = getComputedStyle(el);
+                    var text = (cs.getPropertyValue('--sp-text') || '').trim();
+                    if (!text) text = '#1f2937';
+                    var grid = (cs.getPropertyValue('--sp-border') || '').trim();
+                    if (!grid) grid = 'rgba(0,0,0,0.12)';
+                    return { text: text, grid: grid };
+                }
+
+                function buildOptions(colors) {
+                    return {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        color: colors.text,
+                        plugins: {
+                            legend: { display: false, labels: { color: colors.text } },
+                            tooltip: {
+                                backgroundColor: 'rgba(17, 24, 39, 0.92)',
+                                titleColor: '#f9fafb',
+                                bodyColor: '#f9fafb',
+                                borderColor: colors.grid,
+                                borderWidth: 1,
+                                callbacks: {
+                                    label: function (ctx) {
+                                        var m = ctx.parsed.y;
+                                        if (m == null) return '';
+                                        var h = Math.floor(m / 60);
+                                        var r = m % 60;
+                                        return h > 0 ? (h + 'h ' + r + 'm') : (m + ' min');
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    color: colors.text,
+                                    maxRotation: 40,
+                                    minRotation: 0,
+                                    font: { weight: '600', size: 12 }
+                                },
+                                grid: { color: colors.grid },
+                                border: { color: colors.grid }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    color: colors.text,
+                                    font: { weight: '600', size: 12 },
+                                    callback: function (v) { return v + ' m'; }
+                                },
+                                grid: { color: colors.grid },
+                                border: { color: colors.grid }
+                            }
+                        }
+                    };
+                }
+
+                var c = themeColors();
+                var chart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.map(function (d) { return d.label; }),
+                        datasets: [{
+                            label: 'Minutes',
+                            data: data.map(function (d) { return d.minutes; }),
+                            backgroundColor: 'rgba(124, 58, 237, 0.55)',
+                            borderColor: 'rgba(124, 58, 237, 0.95)',
+                            borderWidth: 1,
+                            borderRadius: 8,
+                            maxBarThickness: 48
+                        }]
+                    },
+                    options: buildOptions(c)
+                });
+
+                function applyChartTheme(colors) {
+                    chart.options.color = colors.text;
+                    if (chart.options.plugins && chart.options.plugins.legend && chart.options.plugins.legend.labels) {
+                        chart.options.plugins.legend.labels.color = colors.text;
+                    }
+                    chart.options.scales.x.ticks.color = colors.text;
+                    chart.options.scales.y.ticks.color = colors.text;
+                    chart.options.scales.x.grid.color = colors.grid;
+                    chart.options.scales.y.grid.color = colors.grid;
+                    if (chart.options.scales.x.border) chart.options.scales.x.border.color = colors.grid;
+                    if (chart.options.scales.y.border) chart.options.scales.y.border.color = colors.grid;
+                    chart.update();
+                }
+
+                var shell = document.querySelector('.sp-shell');
+                if (shell && window.MutationObserver) {
+                    var obs = new MutationObserver(function () {
+                        applyChartTheme(themeColors());
+                    });
+                    obs.observe(shell, { attributes: true, attributeFilter: ['data-theme'] });
+                }
+            })();
+        </script>
+    }
+}

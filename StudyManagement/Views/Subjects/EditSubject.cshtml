@@ -1,0 +1,63 @@
+@model StudyManagement.Models.Subject
+
+@{
+    ViewData["Title"] = "Edit Subject";
+    ViewData["Breadcrumbs"] = new List<BreadcrumbItem> {
+        new("Dashboard", Url.Action("Index", "Home")!),
+        new("Subjects", Url.Action("Index", "Subjects")!),
+        new("Edit subject", null)
+    };
+}
+
+<header class="sp-titlebar">
+    <div>
+        <h1 class="sp-h1">Edit Subject <span class="sp-h1-icon" aria-hidden="true">✎</span></h1>
+        <p class="sp-subtitle">Update subject information</p>
+    </div>
+</header>
+
+<div class="sp-panel">
+    <div class="sp-panel-header">
+        <div class="sp-panel-badge" aria-hidden="true">✎</div>
+        <h2 class="sp-panel-title">@Model.Name</h2>
+    </div>
+    <div class="sp-panel-body">
+        <form asp-action="EditSubject" asp-controller="Subjects" method="post" class="sp-form">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@Model.Id" />
+
+            <div class="sp-form-grid">
+                <label class="sp-field">
+                    <span class="sp-label">Name</span>
+                    <input name="name" value="@Model.Name" required />
+                </label>
+
+                <label class="sp-field">
+                    <span class="sp-label">Professor</span>
+                    <input name="professor" value="@Model.Professor" />
+                </label>
+
+                <label class="sp-field">
+                    <span class="sp-label">Credits</span>
+                    <input type="number" name="credits" value="@Model.Credits" min="0" max="60" />
+                </label>
+
+                <label class="sp-field">
+                    <span class="sp-label">Color</span>
+                    <input name="colorHex" value="@Model.ColorHex" placeholder="#7c3aed" />
+                </label>
+
+                <label class="sp-field sp-field-full">
+                    <span class="sp-label">Description</span>
+                    <textarea name="description" rows="3">@Model.Description</textarea>
+                </label>
+            </div>
+
+            <div class="sp-form-actions">
+                <a class="sp-btn-secondary" asp-action="Index" asp-controller="Subjects">Cancel</a>
+                <button type="submit" class="sp-btn-primary">Update</button>
+            </div>
+        </form>
+    </div>
+</div>
+
